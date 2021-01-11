@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Sieve.Attributes;
 using SieveUnitTests.Abstractions.Entity;
 
@@ -27,6 +29,9 @@ namespace SieveUnitTests.Entities
         public string ThisHasNoAttributeButIsAccessible { get; set; }
 
         public int OnlySortableViaFluentApi { get; set; }
+
+        [Sieve(CanFilter = true)]
+        public IEnumerable<string> Tags { get; set; } = Enumerable.Empty<string>();
 
         public Comment TopComment { get; set; }
         public Comment FeaturedComment { get; set; }

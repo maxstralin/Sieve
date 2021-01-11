@@ -33,7 +33,8 @@ namespace SieveUnitTests
                     IsDraft = true,
                     CategoryId = null,
                     TopComment = new Comment { Id = 0, Text = "A1" },
-                    FeaturedComment = new Comment { Id = 4, Text = "A2" }
+                    FeaturedComment = new Comment { Id = 4, Text = "A2" },
+                    Tags = new [] { "tagged" }
                 },
                 new Post() {
                     Id = 1,
@@ -42,7 +43,8 @@ namespace SieveUnitTests
                     IsDraft = false,
                     CategoryId = 1,
                     TopComment = new Comment { Id = 3, Text = "B1" },
-                    FeaturedComment = new Comment { Id = 5, Text = "B2" }
+                    FeaturedComment = new Comment { Id = 5, Text = "B2" },
+                    Tags = new [] { "tag" }
                 },
                 new Post() {
                     Id = 2,
@@ -135,6 +137,25 @@ namespace SieveUnitTests
             var result = _processor.Apply(model, _posts);
 
             Assert.IsTrue(result.Count() == 3);
+        }
+
+        [TestMethod]
+        public void CanFilterArray()
+        {
+            var expectedCount = 2;
+            var expectedIds = new[] {0,1}.ToList();
+            var model = new SieveModel()
+            {
+                Filters = "Tags==tagged|tag"
+            };
+
+            var result = _processor.Apply(model, _posts);
+            var ids = result.Select(a => a.Id).ToList();
+            
+            Assert.AreEqual(result.Count(), expectedCount);
+            Assert.AreEqual(expectedIds[0], ids[0]);
+            Assert.AreEqual(expectedIds[1], ids[1]);
+
         }
 
         [TestMethod]
