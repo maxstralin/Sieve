@@ -202,7 +202,7 @@ namespace Sieve.Services
                             var isFilterTermValueNull = filterTermValue.ToLower() == nullFilterValue;
                             var filterValue = isFilterTermValueNull
                                 ? Expression.Constant(null, property.PropertyType)
-                                : ConvertStringValueToConstantExpression(filterTermValue, property, converter);
+                                : ConvertFilterValueToExpression(filterTermValue, property, converter, propertyValue);
 
                             if (filterTerm.OperatorIsCaseInsensitive)
                             {
@@ -215,7 +215,7 @@ namespace Sieve.Services
                                     .First(m => m.Name == "ToUpper" && m.GetParameters().Length == 0));
                             }
 
-                            var expression = GetExpression(filterTerm, filterValue, propertyValue);
+                            var expression = typeof(IEnumerable<string>).IsAssignableFrom(property.PropertyType) ? filterValue : GetExpressionFromTerm(filterTerm, filterValue, propertyValue);
 
                             if (filterTerm.OperatorIsNegated)
                             {
@@ -275,18 +275,30 @@ namespace Sieve.Services
                 : Expression.AndAlso(nullCheckExpression, Expression.NotEqual(propertyValue, Expression.Default(propertyValue.Type)));
         }
 
+        private Expression ConvertFilterValueToExpression(string value, PropertyInfo property, TypeConverter converter, dynamic propertyValue)
+        {
+            if (typeof(IEnumerable<string>).IsAssignableFrom(property.PropertyType))
+            {
+                
+                return Expression.Call(null,
+                    typeof(Enumerable).GetMethods().Single(a => a.Name == "Contains" && a.GetParameters().Length == 2).MakeGenericMethod(typeof(string)),
+                    propertyValue, Expression.Constant(value));
+            }
+            else return ConvertStringValueToConstantExpression(value, property, converter);
+        }
+        
         private Expression ConvertStringValueToConstantExpression(string value, PropertyInfo property, TypeConverter converter)
         {
             dynamic constantVal = converter.CanConvertFrom(typeof(string))
                 ? converter.ConvertFrom(value)
-                : Convert.ChangeType(value, property.PropertyType);
+                : Convert.ChangeType(value, property.PropertyType); 
 
             return GetClosureOverConstant(constantVal, property.PropertyType);
         }
 
-        private static Expression GetExpression(TFilterTerm filterTerm, dynamic filterValue, dynamic propertyValue)
+        private static Expression GetExpressionFromOperator(FilterOperator filterOperator, dynamic filterValue, dynamic propertyValue)
         {
-            switch (filterTerm.OperatorParsed)
+            switch (filterOperator)
             {
                 case FilterOperator.Equals:
                     return Expression.Equal(propertyValue, filterValue);
@@ -303,17 +315,20 @@ namespace Sieve.Services
                 case FilterOperator.Contains:
                     return Expression.Call(propertyValue,
                         typeof(string).GetMethods()
-                        .First(m => m.Name == "Contains" && m.GetParameters().Length == 1),
+                            .First(m => m.Name == "Contains" && m.GetParameters().Length == 1),
                         filterValue);
                 case FilterOperator.StartsWith:
                     return Expression.Call(propertyValue,
                         typeof(string).GetMethods()
-                        .First(m => m.Name == "StartsWith" && m.GetParameters().Length == 1),
+                            .First(m => m.Name == "StartsWith" && m.GetParameters().Length == 1),
                         filterValue);
                 default:
                     return Expression.Equal(propertyValue, filterValue);
             }
         }
+
+        private static Expression GetExpressionFromTerm(TFilterTerm filterTerm, dynamic filterValue,
+            dynamic propertyValue) => GetExpressionFromOperator(filterTerm.OperatorParsed, filterValue, propertyValue);
 
         // Workaround to ensure that the filter value gets passed as a parameter in generated SQL from EF Core
         // See https://github.com/aspnet/EntityFrameworkCore/issues/3361
